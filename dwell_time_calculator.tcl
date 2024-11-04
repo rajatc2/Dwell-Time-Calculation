@@ -9,7 +9,7 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	set lowerEnd -8
 	
 	# Opening file
-	set outfile [open "${op_folder}/ioncalc_${ion_res}.dat" w]
+	set outfile [open "${op_folder}/dwell_time_info_${ion_res}.dat" w]
 
 	# Start counting permeation events after this number of frames
 	set skipFrame 0
@@ -25,11 +25,18 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	foreach foo $segList {
   	lappend labelList 0
 	}
+	#puts "$labelList"
 
 	set num1 0
 	set num2 0
 	#set numFrame [molinfo top get numframes]
 	set numFrame 2700
+	
+	set permeated_ion_list {}
+	set exit_frame {}
+	
+	set entering_ion_list {}
+	set enter_frame {}
 
 
 	# Each water molecule has a label, which has 5 possible values
@@ -56,6 +63,9 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	      set newLab 2
 	      if {$oldLab == -1} {
 	        puts $outfile "$segname:$resid permeated through the nanotubes along +z direction at frame $fr"
+	        #puts "$resid"
+	        lappend permeated_ion_list "$resid"
+	        lappend exit_frame "$fr"
 	        if {$fr >= $skipFrame} {
 	          incr num1
 	        }
@@ -70,6 +80,22 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	      }
 	    } elseif {abs($oldLab) > 1} {
 	      set newLab [expr $oldLab / 2]
+	      #puts "ResID: $resid, Segname: $segname"
+	      #puts "Changing from $oldLab to $newLab in frame: $fr"
+	      
+	      set lastElement [lindex $entering_ion_list end]
+	      
+	      # Check if the last element is equal to the specified value
+	      if {$lastElement != $resid} {
+    		lappend entering_ion_list "$resid"
+    		lappend enter_frame "$fr"
+	      } else {
+    		  #puts "The last element is '$checkValue'. Doing another thing..."
+    		  set enter_frame [lreplace $enter_frame end end "$fr"]
+		}
+	      
+	      #lappend entering_ion_list "$resid"
+	      #lappend enter_frame "$fr"
 	    } else {
 	      set newLab $oldLab
 	    }
@@ -86,5 +112,42 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	  puts "The specified first frame ($skipFrame) is larger than the total number of frames ($numFrame)"
 	}
 	mol delete all
+	puts $outfile ""
+	puts $outfile "ResIDs of permeated ions $permeated_ion_list"
+	puts $outfile "Exit frames of ions $exit_frame"
+	puts $outfile ""
+	puts $outfile "ResIDs of entering ions $entering_ion_list"
+	puts $outfile "Enter frames of ions $enter_frame"
+	#close $outfile
+	
+	
+	# Dictionary to store the time spent in the region for each ion
+	set time_in_region {}
+	set ion_with_time {}
+
+	# Loop through each ion in the entering list
+	foreach ion_id $entering_ion_list entry_time $enter_frame {
+    	# Find the index of the ion in permeated_ion_list to get the exit time
+    		set exit_index [lsearch -exact $permeated_ion_list $ion_id]
+
+    		if {$exit_index != -1} {
+        		# Ion has an exit record; get the corresponding exit time
+        		set exit_time [lindex $exit_frame $exit_index]
+        
+        		# Calculate the time spent in the region and store it
+        		set time_spent [expr {($exit_time - $entry_time)*5}]
+        		#puts "Ion $ion_id spent $time_spent time units in the region."
+        
+        		# Save the result to the dictionary
+        		lappend ion_with_time $ion_id
+        		lappend time_in_region $time_spent
+    		} else {
+        		# No exit record found for this ion
+        		puts "Ion $ion_id did not exit the region."
+    		}
+	}
+	
+	puts $outfile ""
+	puts $outfile "Dwell times of $ion_with_time ::: $time_in_region"
 	close $outfile
 }
