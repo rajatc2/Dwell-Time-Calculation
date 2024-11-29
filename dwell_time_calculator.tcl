@@ -5,11 +5,11 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	
 	mol load psf ${op_folder}${structPrefix}.psf dcd ${op_folder}${dcd}.dcd
 	# Specify the upper and lower boundaries of the nanotube layer
-	set upperEnd 8
-	set lowerEnd -8
+	set upperEnd 12.21
+	set lowerEnd -12.21
 	
 	# Opening file
-	set outfile [open "${op_folder}/dwell_time_info_${ion_res}.dat" w]
+	set outfile [open "${op_folder}/dwell_time_info_${ion_res}_${upperEnd}.dat" w]
 
 	# Start counting permeation events after this number of frames
 	set skipFrame 0
@@ -59,9 +59,10 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	  set oldList $labelList
 	  set labelList {}
 	  foreach z [$wat get z] oldLab $oldList segname $segList resid $ridList {
-	    if {$z > $upperEnd} {
+	    if {$z > $upperEnd} {				# Abover upper in the current frame
 	      set newLab 2
-	      if {$oldLab == -1} {
+	      
+	      if {$oldLab == -1} {				### This is to see if it has gone above z from inside the region : -lower < last position < +upper
 	        puts $outfile "$segname:$resid permeated through the nanotubes along +z direction at frame $fr"
 	        #puts "$resid"
 	        lappend permeated_ion_list "$resid"
@@ -69,28 +70,30 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	        if {$fr >= $skipFrame} {
 	          incr num1
 	        }
-	      }
-	    } elseif {$z < $lowerEnd} {
+	      } 
+	    } elseif {$z < $lowerEnd} {				# Below lower in the current frame
 	      set newLab -2
 	      if {$oldLab == 1} {
 	        puts $outfile "$segname:$resid permeated through the nanotubes along -z direction at frame $fr"
+	        lappend permeated_ion_list "$resid"
+	        lappend exit_frame "$fr"
 	        if {$fr >= $skipFrame} {
 	          incr num2
 	        }
 	      }
-	    } elseif {abs($oldLab) > 1} {
+	    } elseif {abs($oldLab) > 1} {			# Inside the tube in the current frame
 	      set newLab [expr $oldLab / 2]
 	      #puts "ResID: $resid, Segname: $segname"
 	      #puts "Changing from $oldLab to $newLab in frame: $fr"
 	      
 	      set lastElement [lindex $entering_ion_list end]
 	      
-	      # Check if the last element is equal to the specified value
-	      if {$lastElement != $resid} {
+	      # Check if the last element is equal to the specified value to avoid repitotion 
+	      if {$lastElement != $resid} {			# New ion
     		lappend entering_ion_list "$resid"
     		lappend enter_frame "$fr"
 	      } else {
-    		  #puts "The last element is '$checkValue'. Doing another thing..."
+    		  #Match found : Replacing last entry frame with the current one
     		  set enter_frame [lreplace $enter_frame end end "$fr"]
 		}
 	      
@@ -111,6 +114,7 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	} else {
 	  puts "The specified first frame ($skipFrame) is larger than the total number of frames ($numFrame)"
 	}
+	
 	mol delete all
 	puts $outfile ""
 	puts $outfile "ResIDs of permeated ions $permeated_ion_list"
@@ -135,12 +139,14 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
         		set exit_time [lindex $exit_frame $exit_index]
         
         		# Calculate the time spent in the region and store it
-        		set time_spent [expr {($exit_time - $entry_time)*5}]
-        		#puts "Ion $ion_id spent $time_spent time units in the region."
+        		if {$exit_time>=$entry_time} {
+        			set time_spent [expr {($exit_time - $entry_time)*5}]
+        			#puts "Ion $ion_id spent $time_spent time units in the region."
         
-        		# Save the result to the dictionary
-        		lappend ion_with_time $ion_id
-        		lappend time_in_region $time_spent
+        			# Save the result to the dictionary
+        			lappend ion_with_time $ion_id
+        			lappend time_in_region $time_spent
+        		}
     		} else {
         		# No exit record found for this ion
         		puts "Ion $ion_id did not exit the region."
@@ -148,6 +154,7 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	}
 	
 	puts $outfile ""
-	puts $outfile "Dwell times of $ion_with_time ::: $time_in_region"
+	puts $outfile "Dwell times of $ion_with_time ::: "
+	puts $outfile "$time_in_region"
 	close $outfile
 }
