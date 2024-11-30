@@ -1,19 +1,18 @@
 # This script identifies water molecules that permeate through the
 # nanotube layer
 
-proc ion_translocate {structPrefix dcd ion_res op_folder} {
+proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
 	
 	mol load psf ${op_folder}${structPrefix}.psf dcd ${op_folder}${dcd}.dcd
 	# Specify the upper and lower boundaries of the nanotube layer
-	set upperEnd 12.21
-	set lowerEnd -12.21
+	set upperEnd ${zmax}
+	set lowerEnd ${zmin}
 	
 	# Opening file
 	set outfile [open "${op_folder}/dwell_time_info_${ion_res}_${upperEnd}.dat" w]
 
 	# Start counting permeation events after this number of frames
 	set skipFrame 0
-	set name "resname ${ion_res}"
 
 	# Rename POT to CLA for chlorine calc
 	puts "Computing permeation events... (please wait)"
@@ -30,7 +29,7 @@ proc ion_translocate {structPrefix dcd ion_res op_folder} {
 	set num1 0
 	set num2 0
 	#set numFrame [molinfo top get numframes]
-	set numFrame 2700
+	set numFrame 5400
 	
 	set permeated_ion_list {}
 	set exit_frame {}
