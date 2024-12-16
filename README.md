@@ -18,6 +18,12 @@ This project calculates the dwell time of ions or biomolecules inside a nanopore
    - Specify other relevant inputs for the function.
 3. Run the script to compute dwell time for ions/biomolecules efficiently.
 
+## Enhanced Dwell Time Calculation Logic  
+The dwell time calculation logic has been updated to improve accuracy and handle complex scenarios:  
+- **Iterative Ion Removal**: Ions are removed sequentially, starting from the first, along with their corresponding entry and exit frames.  
+- **Multiple Crossings**: This approach ensures that ions crossing the pore multiple times are accurately accounted for in the dwell time analysis.  
+This enhancement makes the tool more robust for analyzing transport phenomena in systems where ions or biomolecules exhibit repeated interactions with the pore region.
+
 ## Future Enhancements
 - Extend functionality to support multiple regions of interest.
 - Introduce additional metrics such as velocity and diffusion coefficients.
