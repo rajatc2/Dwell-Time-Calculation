@@ -1,9 +1,9 @@
 # This script identifies water molecules that permeate through the
 # nanotube layer
 
-proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
+proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder op_folder} {
 	
-	mol load psf ${op_folder}${structPrefix}.psf dcd ${op_folder}${dcd}.dcd
+	mol load psf ${ip_folder}${structPrefix}.psf dcd ${ip_folder}${dcd}.dcd
 	# Specify the upper and lower boundaries of the nanotube layer
 	set upperEnd ${zmax}
 	set lowerEnd ${zmin}
@@ -14,7 +14,7 @@ proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
 	# Start counting permeation events after this number of frames
 	set skipFrame 0
 
-	# Rename POT to CLA for chlorine calc
+	# Rename ion_res for specific ion calc
 	puts "Computing permeation events... (please wait)"
 
 	set wat [atomselect top "resname ${ion_res}"]
@@ -29,7 +29,7 @@ proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
 	set num1 0
 	set num2 0
 	#set numFrame [molinfo top get numframes]
-	set numFrame 5400
+	set numFrame $final_frame
 	
 	set permeated_ion_list {}
 	set exit_frame {}
@@ -127,6 +127,12 @@ proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
 	# Dictionary to store the time spent in the region for each ion
 	set time_in_region {}
 	set ion_with_time {}
+	
+	set copied_entry_list $entering_ion_list
+	set copied_entry_frame $enter_frame
+	set copied_exit_list $permeated_ion_list
+	set copied_exit_frame $exit_frame
+	
 
 	# Loop through each ion in the entering list
 	foreach ion_id $entering_ion_list entry_time $enter_frame {
@@ -135,11 +141,37 @@ proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
 
     		if {$exit_index != -1} {
         		# Ion has an exit record; get the corresponding exit time
-        		set exit_time [lindex $exit_frame $exit_index]
+        		#---->old line
+        		#set exit_time [lindex $exit_frame $exit_index]   
+        		
+        		###new code starts
+        		
+        		set copied_index_entry [lsearch -exact $copied_entry_list $ion_id]
+        		set new_entry_time [lindex $copied_entry_frame $copied_index_entry]
+        		set copied_index_exit [lsearch -exact $copied_exit_list $ion_id]
+        		
+        		# Ion might not exist in the exit_frame when one ion enters twice but exits once: skip this loop in such case
+        		if {$copied_index_exit == -1} {
+        			# Skip this iteration
+        			continue
+        		}
+        		
+        		set new_exit_time [lindex $copied_exit_frame $copied_index_exit]
+        		
+        		### Deletes the entry so that duplicates of resid can be included later in calculation
+        		set copied_entry_list [lreplace $copied_entry_list $copied_index_entry $copied_index_entry]
+        		set copied_entry_frame [lreplace $copied_entry_frame $copied_index_entry $copied_index_entry]
+        		set copied_exit_list [lreplace $copied_exit_list $copied_index_exit $copied_index_exit]
+        		set copied_exit_frame [lreplace $copied_exit_frame $copied_index_exit $copied_index_exit]
+        		
+        		###new code ends
+        		
+        		
+        		
         
         		# Calculate the time spent in the region and store it
-        		if {$exit_time>=$entry_time} {
-        			set time_spent [expr {($exit_time - $entry_time)*5}]
+        		if {$new_exit_time>=$new_entry_time} {
+        			set time_spent [expr {($new_exit_time - $new_entry_time)*5}]
         			#puts "Ion $ion_id spent $time_spent time units in the region."
         
         			# Save the result to the dictionary
@@ -152,8 +184,33 @@ proc ion_translocate {structPrefix dcd ion_res zmax zmin op_folder} {
     		}
 	}
 	
+	puts "copied_entry: $copied_entry_list$"
+	puts "$copied_entry_frame"
+	puts "copied_exit: copied_exit_list"
+	puts "$copied_exit_frame"
+	
 	puts $outfile ""
 	puts $outfile "Dwell times of $ion_with_time ::: "
 	puts $outfile "$time_in_region"
+	
+	puts $outfile ""
+	puts $outfile "Summary:"
+	puts $outfile "Ion Type: ${ion_res}"
+	
+	if {$num1 != 0} {
+    		if {$num2 != 0} {
+        		puts $outfile "Direction: Both"
+    		} else {
+        		puts $outfile "Direction: +ve z"
+    		}
+	} else {
+    		puts $outfile "Direction: +ve z"
+	}
+	
+	set total [expr {$num1 + $num2}]
+	puts $outfile "Total number of translocated ions: $total"
+	puts $outfile "Dwell times obtained for ions with resid:  $ion_with_time"
+	puts $outfile "Dwell times:  $time_in_region"
+		
 	close $outfile
 }
