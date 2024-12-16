@@ -63,7 +63,6 @@ proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder o
 	      
 	      if {$oldLab == -1} {				### This is to see if it has gone above z from inside the region : -lower < last position < +upper
 	        puts $outfile "$segname:$resid permeated through the nanotubes along +z direction at frame $fr"
-	        #puts "$resid"
 	        lappend permeated_ion_list "$resid"
 	        lappend exit_frame "$fr"
 	        if {$fr >= $skipFrame} {
@@ -96,8 +95,6 @@ proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder o
     		  set enter_frame [lreplace $enter_frame end end "$fr"]
 		}
 	      
-	      #lappend entering_ion_list "$resid"
-	      #lappend enter_frame "$fr"
 	    } else {
 	      set newLab $oldLab
 	    }
@@ -116,12 +113,18 @@ proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder o
 	
 	mol delete all
 	puts $outfile ""
-	puts $outfile "ResIDs of permeated ions $permeated_ion_list"
-	puts $outfile "Exit frames of ions $exit_frame"
+	puts $outfile "Entry of ions:"
+	set length [llength $entering_ion_list]
+	puts $outfile "Total : $length"
+	puts $outfile "ResIDs : $entering_ion_list"
+	puts $outfile "Enter frames : $enter_frame"
+	
 	puts $outfile ""
-	puts $outfile "ResIDs of entering ions $entering_ion_list"
-	puts $outfile "Enter frames of ions $enter_frame"
-	#close $outfile
+	puts $outfile "Exit of ions:"
+	set length [llength $permeated_ion_list]
+	puts $outfile "Total : $length"
+	puts $outfile "ResIDs : $permeated_ion_list"
+	puts $outfile "Exit frames : $exit_frame"
 	
 	
 	# Dictionary to store the time spent in the region for each ion
@@ -137,80 +140,86 @@ proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder o
 	# Loop through each ion in the entering list
 	foreach ion_id $entering_ion_list entry_time $enter_frame {
     	# Find the index of the ion in permeated_ion_list to get the exit time
-    		set exit_index [lsearch -exact $permeated_ion_list $ion_id]
+    	set exit_index [lsearch -exact $permeated_ion_list $ion_id]
 
-    		if {$exit_index != -1} {
-        		# Ion has an exit record; get the corresponding exit time
-        		#---->old line
-        		#set exit_time [lindex $exit_frame $exit_index]   
+    	if {$exit_index != -1} {
+        	# Ion has an exit record; get the corresponding exit time
+        	#---->old line
+        	#set exit_time [lindex $exit_frame $exit_index]   
         		
-        		###new code starts
+        	###new code starts
         		
-        		set copied_index_entry [lsearch -exact $copied_entry_list $ion_id]
-        		set new_entry_time [lindex $copied_entry_frame $copied_index_entry]
-        		set copied_index_exit [lsearch -exact $copied_exit_list $ion_id]
+        	set copied_index_entry [lsearch -exact $copied_entry_list $ion_id]
+        	set new_entry_time [lindex $copied_entry_frame $copied_index_entry]
+        	set copied_index_exit [lsearch -exact $copied_exit_list $ion_id]
         		
-        		# Ion might not exist in the exit_frame when one ion enters twice but exits once: skip this loop in such case
-        		if {$copied_index_exit == -1} {
-        			# Skip this iteration
-        			continue
-        		}
+        	# Ion might not exist in the exit_frame when one ion enters twice but exits once: skip this loop in such case
+        	if {$copied_index_exit == -1} {
+        		# Skip this iteration
+        		continue
+        	}
         		
-        		set new_exit_time [lindex $copied_exit_frame $copied_index_exit]
+        	set new_exit_time [lindex $copied_exit_frame $copied_index_exit]
         		
-        		### Deletes the entry so that duplicates of resid can be included later in calculation
-        		set copied_entry_list [lreplace $copied_entry_list $copied_index_entry $copied_index_entry]
-        		set copied_entry_frame [lreplace $copied_entry_frame $copied_index_entry $copied_index_entry]
-        		set copied_exit_list [lreplace $copied_exit_list $copied_index_exit $copied_index_exit]
-        		set copied_exit_frame [lreplace $copied_exit_frame $copied_index_exit $copied_index_exit]
+        	### Deletes the entry from both entry and exist list so that duplicates of resid can be included later in calculation
+        	set copied_entry_list [lreplace $copied_entry_list $copied_index_entry $copied_index_entry]
+        	set copied_entry_frame [lreplace $copied_entry_frame $copied_index_entry $copied_index_entry]
+        	set copied_exit_list [lreplace $copied_exit_list $copied_index_exit $copied_index_exit]
+        	set copied_exit_frame [lreplace $copied_exit_frame $copied_index_exit $copied_index_exit]
         		
-        		###new code ends
+        	###new code ends
         		
         		
         		
         
-        		# Calculate the time spent in the region and store it
-        		if {$new_exit_time>=$new_entry_time} {
-        			set time_spent [expr {($new_exit_time - $new_entry_time)*5}]
-        			#puts "Ion $ion_id spent $time_spent time units in the region."
+        	# Calculate the time spent in the region and store it
+        	if {$new_exit_time>=$new_entry_time} {
+        		set time_spent [expr {($new_exit_time - $new_entry_time)*5}]
+        		#puts "Ion $ion_id spent $time_spent time units in the region."
         
-        			# Save the result to the dictionary
-        			lappend ion_with_time $ion_id
-        			lappend time_in_region $time_spent
-        		}
-    		} else {
-        		# No exit record found for this ion
-        		puts "Ion $ion_id did not exit the region."
-    		}
+        		# Save the result to the dictionary
+        		lappend ion_with_time $ion_id
+        		lappend time_in_region $time_spent
+        	}
+    	} else {
+        	# No exit record found for this ion
+        	puts $outfile "Ion $ion_id did not exit the region."
+    	}
 	}
 	
-	puts "copied_entry: $copied_entry_list$"
-	puts "$copied_entry_frame"
-	puts "copied_exit: copied_exit_list"
-	puts "$copied_exit_frame"
+	puts $outfile ""
+	puts $outfile "copied_entry remaining : $copied_entry_list"
+	set length [llength $copied_entry_list]
+	puts $outfile "Total : $length"
+	puts $outfile "Corresponding frames : $copied_entry_frame"
+	puts $outfile "copied_exit remaining: $copied_exit_list"
+	set length [llength $copied_exit_list]
+	puts $outfile "Total : $length"
+	puts $outfile "Corresponding frames : $copied_exit_frame"
 	
 	puts $outfile ""
-	puts $outfile "Dwell times of $ion_with_time ::: "
-	puts $outfile "$time_in_region"
+	puts $outfile "Dwell times :"
+	puts $outfile "ResID : $ion_with_time"
+	puts $outfile "Time: $time_in_region"
 	
 	puts $outfile ""
 	puts $outfile "Summary:"
 	puts $outfile "Ion Type: ${ion_res}"
 	
 	if {$num1 != 0} {
-    		if {$num2 != 0} {
-        		puts $outfile "Direction: Both"
-    		} else {
-        		puts $outfile "Direction: +ve z"
-    		}
+    	if {$num2 != 0} {
+        	puts $outfile "Direction: Both"
+    	} else {
+        	puts $outfile "Direction: +ve z"
+    	}
 	} else {
     		puts $outfile "Direction: +ve z"
 	}
 	
 	set total [expr {$num1 + $num2}]
-	puts $outfile "Total number of translocated ions: $total"
-	puts $outfile "Dwell times obtained for ions with resid:  $ion_with_time"
-	puts $outfile "Dwell times:  $time_in_region"
+	puts $outfile "Total number of translocated ions : $total"
+	puts $outfile "Dwell times obtained for ions with resid : $ion_with_time"
+	puts $outfile "Dwell times : $time_in_region"
 		
 	close $outfile
 }
