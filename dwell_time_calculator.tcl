@@ -1,7 +1,7 @@
 # This script identifies water molecules that permeate through the
 # nanotube layer
 
-proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder op_folder} {
+proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder op_folder op_file} {
 	
 	mol load psf ${ip_folder}${structPrefix}.psf dcd ${ip_folder}${dcd}.dcd
 	# Specify the upper and lower boundaries of the nanotube layer
@@ -9,7 +9,7 @@ proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder o
 	set lowerEnd ${zmin}
 	
 	# Opening file
-	set outfile [open "${op_folder}/dwell_time_info_${ion_res}_${upperEnd}.dat" w]
+	set outfile [open "${op_folder}/dwell_time_info_${ion_res}_${op_file}.dat" w]
 
 	# Start counting permeation events after this number of frames
 	set skipFrame 0
@@ -84,17 +84,21 @@ proc ion_translocate {structPrefix dcd ion_res final_frame zmax zmin ip_folder o
 	      #puts "ResID: $resid, Segname: $segname"
 	      #puts "Changing from $oldLab to $newLab in frame: $fr"
 	      
-	      set lastElement [lindex $entering_ion_list end]
+	      set lastElement [lindex $entering_ion_list end]	
 	      
 	      # Check if the last element is equal to the specified value to avoid repitotion 
 	      if {$lastElement != $resid} {			# New ion
     		lappend entering_ion_list "$resid"
     		lappend enter_frame "$fr"
 	      } else {
-    		  #Match found : Replacing last entry frame with the current one
-    		  set enter_frame [lreplace $enter_frame end end "$fr"]
+	      	  # To check if the last permeated ion is going back inside the region
+	      	  set lastExit [lindex $permeated_ion_list end]
+    		  
+    		  if {$lastElement != $lastExit} {	#last permeated ion is not going back
+    		  	#Match found : Replacing last entry frame with the current one
+    		  	set enter_frame [lreplace $enter_frame end end "$fr"]
+    		  }
 		}
-	      
 	    } else {
 	      set newLab $oldLab
 	    }
